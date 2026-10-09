@@ -1,0 +1,416 @@
+//@version=6
+indicator("Time & Session Dividers - Enhanced", "NXS TIME DIVIDERS", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// === HELPER FUNCTIONS ===
+
+// Function to format the timeframe string for the label
+f_formatTimeframe(string timeframe) =>
+    switch timeframe
+        "1" => "1M"
+        "3" => "3M"
+        "5" => "5M"
+        "15" => "15M"
+        "30" => "30M"
+        "60" => "1H"
+        "120" => "2H"
+        "180" => "3H"
+        "240" => "4H"
+        "D" => "1D"
+        "W" => "1W"
+        "M" => "1M"
+        => timeframe
+
+// === INPUTS ===
+
+g0 = "Global Settings"
+i_labelSize = input.string("normal", "Label Size", options=["tiny", "small", "normal", "large", "huge"], group=g0)
+i_lookbackHours = input.int(3, "Lookback Hours", minval=1, maxval=24, group=g0, tooltip="Only show dividers from the past X hours")
+i_showForward = input.bool(true, "Show Forward Divider (forming candle)", group=g0, tooltip="Draw divider at the close of the currently forming HTF candle")
+
+// === HTF X-RAY CANDLES (Big 4) ===
+gXray1 = "HTF X-Ray Slot 1"
+xray1_en = input.bool(true, "Enable Slot 1", group=gXray1, inline="x1a")
+xray1_tf = input.timeframe("60", "Timeframe", group=gXray1, inline="x1a")
+xray1_bullCol = input.color(color.new(color.rgb(40,200,120),85), "Body Bull", group=gXray1, inline="x1b")
+xray1_bearCol = input.color(color.new(color.rgb(220,80,110),85), "Body Bear", group=gXray1, inline="x1b")
+xray1_borderCol = input.color(color.new(color.black,0), "Border", group=gXray1, inline="x1c")
+xray1_wickCol = input.color(color.new(color.black,40), "Wick", group=gXray1, inline="x1c")
+xray1_eqCol = input.color(color.new(color.gray,30), "EQ", group=gXray1, inline="x1d")
+xray1_showWick = input.bool(true, "Wick", group=gXray1, inline="x1e")
+xray1_showEQ = input.bool(true, "EQ", group=gXray1, inline="x1e")
+
+gXray2 = "HTF X-Ray Slot 2"
+xray2_en = input.bool(true, "Enable Slot 2", group=gXray2, inline="x2a")
+xray2_tf = input.timeframe("120", "Timeframe", group=gXray2, inline="x2a")
+xray2_bullCol = input.color(color.new(color.rgb(40,200,120),88), "Body Bull", group=gXray2, inline="x2b")
+xray2_bearCol = input.color(color.new(color.rgb(220,80,110),88), "Body Bear", group=gXray2, inline="x2b")
+xray2_borderCol = input.color(color.new(color.blue,20), "Border", group=gXray2, inline="x2c")
+xray2_wickCol = input.color(color.new(color.blue,50), "Wick", group=gXray2, inline="x2c")
+xray2_eqCol = input.color(color.new(color.blue,40), "EQ", group=gXray2, inline="x2d")
+xray2_showWick = input.bool(true, "Wick", group=gXray2, inline="x2e")
+xray2_showEQ = input.bool(true, "EQ", group=gXray2, inline="x2e")
+
+gXray3 = "HTF X-Ray Slot 3"
+xray3_en = input.bool(true, "Enable Slot 3", group=gXray3, inline="x3a")
+xray3_tf = input.timeframe("180", "Timeframe", group=gXray3, inline="x3a")
+xray3_bullCol = input.color(color.new(color.rgb(40,200,120),91), "Body Bull", group=gXray3, inline="x3b")
+xray3_bearCol = input.color(color.new(color.rgb(220,80,110),91), "Body Bear", group=gXray3, inline="x3b")
+xray3_borderCol = input.color(color.new(color.purple,20), "Border", group=gXray3, inline="x3c")
+xray3_wickCol = input.color(color.new(color.purple,50), "Wick", group=gXray3, inline="x3c")
+xray3_eqCol = input.color(color.new(color.purple,40), "EQ", group=gXray3, inline="x3d")
+xray3_showWick = input.bool(true, "Wick", group=gXray3, inline="x3e")
+xray3_showEQ = input.bool(true, "EQ", group=gXray3, inline="x3e")
+
+gXray4 = "HTF X-Ray Slot 4"
+xray4_en = input.bool(false, "Enable Slot 4", group=gXray4, inline="x4a")
+xray4_tf = input.timeframe("240", "Timeframe", group=gXray4, inline="x4a")
+xray4_bullCol = input.color(color.new(color.rgb(40,200,120),94), "Body Bull", group=gXray4, inline="x4b")
+xray4_bearCol = input.color(color.new(color.rgb(220,80,110),94), "Body Bear", group=gXray4, inline="x4b")
+xray4_borderCol = input.color(color.new(color.orange,20), "Border", group=gXray4, inline="x4c")
+xray4_wickCol = input.color(color.new(color.orange,50), "Wick", group=gXray4, inline="x4c")
+xray4_eqCol = input.color(color.new(color.orange,40), "EQ", group=gXray4, inline="x4d")
+xray4_showWick = input.bool(true, "Wick", group=gXray4, inline="x4e")
+xray4_showEQ = input.bool(true, "EQ", group=gXray4, inline="x4e")
+
+// --- Divider 1 Settings (Timeframe) ---
+g1 = "Timeframe Divider 1"
+i_useDivider1 = input.bool(true, "Show Divider 1", group=g1)
+i_timeframe1 = input.timeframe("60", "Timeframe 1", group=g1)
+i_lineColor1 = input.color(color.white, "Line Color 1", group=g1, inline="style1")
+i_lineWidth1 = input.int(2, "Width", minval=1, maxval=10, group=g1, inline="style1")
+i_lineStyleStr1 = input.string("Solid", "Line Style 1", options=["Solid", "Dotted", "Dashed"], group=g1)
+i_showText1 = input.bool(true, "Show Text 1", group=g1)
+
+// --- Divider 2 Settings (Timeframe) ---
+g2 = "Timeframe Divider 2"
+i_useDivider2 = input.bool(true, "Show Divider 2", group=g2)
+i_timeframe2 = input.timeframe("30", "Timeframe 2", group=g2)
+i_lineColor2 = input.color(color.new(color.blue, 20), "Line Color 2", group=g2, inline="style2")
+i_lineWidth2 = input.int(1, "Width", minval=1, maxval=10, group=g2, inline="style2")
+i_lineStyleStr2 = input.string("Dashed", "Line Style 2", options=["Solid", "Dotted", "Dashed"], group=g2)
+i_showText2 = input.bool(false, "Show Text 2", group=g2)
+
+// --- Divider 3 Settings (Timeframe) ---
+g3 = "Timeframe Divider 3"
+i_useDivider3 = input.bool(true, "Show Divider 3", group=g3)
+i_timeframe3 = input.timeframe("15", "Timeframe 3", group=g3)
+i_lineColor3 = input.color(color.new(color.yellow, 60), "Line Color 3", group=g3, inline="style3")
+i_lineWidth3 = input.int(1, "Width", minval=1, maxval=10, group=g3, inline="style3")
+i_lineStyleStr3 = input.string("Dotted", "Line Style 3", options=["Solid", "Dotted", "Dashed"], group=g3)
+i_showText3 = input.bool(false, "Show Text 3", group=g3)
+
+// Convert label size string to constant
+var labelSizeValue = i_labelSize == "tiny" ? size.tiny : i_labelSize == "small" ? size.small : i_labelSize == "large" ? size.large : i_labelSize == "huge" ? size.huge : size.normal
+
+// Lookback calculation
+lookbackMs = i_lookbackHours * 60 * 60 * 1000
+withinLookback = (timenow - time) <= lookbackMs
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HTF X-RAY CANDLES (Big 4 Overlay)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Slot 1
+var box xray1_body = na
+var line xray1_wick = na
+var line xray1_eq = na
+
+if xray1_en
+    [o1, h1, l1, c1] = request.security(syminfo.tickerid, xray1_tf, [open, high, low, close], barmerge.gaps_off, barmerge.lookahead_off)
+    tOpen1 = request.security(syminfo.tickerid, xray1_tf, time, barmerge.gaps_off, barmerge.lookahead_off)
+    tClose1 = request.security(syminfo.tickerid, xray1_tf, time_close, barmerge.gaps_off, barmerge.lookahead_off)
+    newHTF1 = ta.change(time(xray1_tf)) != 0
+    
+    top1 = math.max(o1, c1)
+    bot1 = math.min(o1, c1)
+    mid1 = (top1 + bot1) * 0.5
+    midTime1 = (tOpen1 + tClose1) / 2
+    bull1 = c1 >= o1
+    
+    if na(xray1_body) or newHTF1
+        if not na(xray1_body)
+            box.delete(xray1_body)
+        if not na(xray1_wick)
+            line.delete(xray1_wick)
+        if not na(xray1_eq)
+            line.delete(xray1_eq)
+        
+        xray1_body := box.new(tOpen1, top1, tClose1, bot1, xloc=xloc.bar_time, bgcolor=bull1 ? xray1_bullCol : xray1_bearCol, border_color=xray1_borderCol, border_width=1)
+        if xray1_showWick
+            xray1_wick := line.new(midTime1, h1, midTime1, l1, xloc=xloc.bar_time, color=xray1_wickCol, width=2)
+        if xray1_showEQ
+            xray1_eq := line.new(tOpen1, mid1, tClose1, mid1, xloc=xloc.bar_time, color=xray1_eqCol, style=line.style_dotted, width=1)
+    else
+        if not na(xray1_body)
+            box.set_left(xray1_body, tOpen1), box.set_right(xray1_body, tClose1)
+            box.set_top(xray1_body, top1), box.set_bottom(xray1_body, bot1)
+            box.set_bgcolor(xray1_body, bull1 ? xray1_bullCol : xray1_bearCol)
+        
+        if xray1_showWick
+            if na(xray1_wick)
+                xray1_wick := line.new(midTime1, h1, midTime1, l1, xloc=xloc.bar_time, color=xray1_wickCol, width=2)
+            else
+                line.set_x1(xray1_wick, midTime1), line.set_x2(xray1_wick, midTime1)
+                line.set_y1(xray1_wick, h1), line.set_y2(xray1_wick, l1)
+        else if not na(xray1_wick)
+            line.delete(xray1_wick)
+            xray1_wick := na
+        
+        if xray1_showEQ
+            if na(xray1_eq)
+                xray1_eq := line.new(tOpen1, mid1, tClose1, mid1, xloc=xloc.bar_time, color=xray1_eqCol, style=line.style_dotted, width=1)
+            else
+                line.set_x1(xray1_eq, tOpen1), line.set_x2(xray1_eq, tClose1)
+                line.set_y1(xray1_eq, mid1), line.set_y2(xray1_eq, mid1)
+        else if not na(xray1_eq)
+            line.delete(xray1_eq)
+            xray1_eq := na
+
+// Slot 2
+var box xray2_body = na
+var line xray2_wick = na
+var line xray2_eq = na
+
+if xray2_en
+    [o2, h2, l2, c2] = request.security(syminfo.tickerid, xray2_tf, [open, high, low, close], barmerge.gaps_off, barmerge.lookahead_off)
+    tOpen2 = request.security(syminfo.tickerid, xray2_tf, time, barmerge.gaps_off, barmerge.lookahead_off)
+    tClose2 = request.security(syminfo.tickerid, xray2_tf, time_close, barmerge.gaps_off, barmerge.lookahead_off)
+    newHTF2 = ta.change(time(xray2_tf)) != 0
+    
+    top2 = math.max(o2, c2)
+    bot2 = math.min(o2, c2)
+    mid2 = (top2 + bot2) * 0.5
+    midTime2 = (tOpen2 + tClose2) / 2
+    bull2 = c2 >= o2
+    
+    if na(xray2_body) or newHTF2
+        if not na(xray2_body)
+            box.delete(xray2_body)
+        if not na(xray2_wick)
+            line.delete(xray2_wick)
+        if not na(xray2_eq)
+            line.delete(xray2_eq)
+        
+        xray2_body := box.new(tOpen2, top2, tClose2, bot2, xloc=xloc.bar_time, bgcolor=bull2 ? xray2_bullCol : xray2_bearCol, border_color=xray2_borderCol, border_width=1)
+        if xray2_showWick
+            xray2_wick := line.new(midTime2, h2, midTime2, l2, xloc=xloc.bar_time, color=xray2_wickCol, width=2)
+        if xray2_showEQ
+            xray2_eq := line.new(tOpen2, mid2, tClose2, mid2, xloc=xloc.bar_time, color=xray2_eqCol, style=line.style_dotted, width=1)
+    else
+        if not na(xray2_body)
+            box.set_left(xray2_body, tOpen2), box.set_right(xray2_body, tClose2)
+            box.set_top(xray2_body, top2), box.set_bottom(xray2_body, bot2)
+            box.set_bgcolor(xray2_body, bull2 ? xray2_bullCol : xray2_bearCol)
+        
+        if xray2_showWick
+            if na(xray2_wick)
+                xray2_wick := line.new(midTime2, h2, midTime2, l2, xloc=xloc.bar_time, color=xray2_wickCol, width=2)
+            else
+                line.set_x1(xray2_wick, midTime2), line.set_x2(xray2_wick, midTime2)
+                line.set_y1(xray2_wick, h2), line.set_y2(xray2_wick, l2)
+        else if not na(xray2_wick)
+            line.delete(xray2_wick)
+            xray2_wick := na
+        
+        if xray2_showEQ
+            if na(xray2_eq)
+                xray2_eq := line.new(tOpen2, mid2, tClose2, mid2, xloc=xloc.bar_time, color=xray2_eqCol, style=line.style_dotted, width=1)
+            else
+                line.set_x1(xray2_eq, tOpen2), line.set_x2(xray2_eq, tClose2)
+                line.set_y1(xray2_eq, mid2), line.set_y2(xray2_eq, mid2)
+        else if not na(xray2_eq)
+            line.delete(xray2_eq)
+            xray2_eq := na
+
+// Slot 3
+var box xray3_body = na
+var line xray3_wick = na
+var line xray3_eq = na
+
+if xray3_en
+    [o3, h3, l3, c3] = request.security(syminfo.tickerid, xray3_tf, [open, high, low, close], barmerge.gaps_off, barmerge.lookahead_off)
+    tOpen3 = request.security(syminfo.tickerid, xray3_tf, time, barmerge.gaps_off, barmerge.lookahead_off)
+    tClose3 = request.security(syminfo.tickerid, xray3_tf, time_close, barmerge.gaps_off, barmerge.lookahead_off)
+    newHTF3 = ta.change(time(xray3_tf)) != 0
+    
+    top3 = math.max(o3, c3)
+    bot3 = math.min(o3, c3)
+    mid3 = (top3 + bot3) * 0.5
+    midTime3 = (tOpen3 + tClose3) / 2
+    bull3 = c3 >= o3
+    
+    if na(xray3_body) or newHTF3
+        if not na(xray3_body)
+            box.delete(xray3_body)
+        if not na(xray3_wick)
+            line.delete(xray3_wick)
+        if not na(xray3_eq)
+            line.delete(xray3_eq)
+        
+        xray3_body := box.new(tOpen3, top3, tClose3, bot3, xloc=xloc.bar_time, bgcolor=bull3 ? xray3_bullCol : xray3_bearCol, border_color=xray3_borderCol, border_width=1)
+        if xray3_showWick
+            xray3_wick := line.new(midTime3, h3, midTime3, l3, xloc=xloc.bar_time, color=xray3_wickCol, width=2)
+        if xray3_showEQ
+            xray3_eq := line.new(tOpen3, mid3, tClose3, mid3, xloc=xloc.bar_time, color=xray3_eqCol, style=line.style_dotted, width=1)
+    else
+        if not na(xray3_body)
+            box.set_left(xray3_body, tOpen3), box.set_right(xray3_body, tClose3)
+            box.set_top(xray3_body, top3), box.set_bottom(xray3_body, bot3)
+            box.set_bgcolor(xray3_body, bull3 ? xray3_bullCol : xray3_bearCol)
+        
+        if xray3_showWick
+            if na(xray3_wick)
+                xray3_wick := line.new(midTime3, h3, midTime3, l3, xloc=xloc.bar_time, color=xray3_wickCol, width=2)
+            else
+                line.set_x1(xray3_wick, midTime3), line.set_x2(xray3_wick, midTime3)
+                line.set_y1(xray3_wick, h3), line.set_y2(xray3_wick, l3)
+        else if not na(xray3_wick)
+            line.delete(xray3_wick)
+            xray3_wick := na
+        
+        if xray3_showEQ
+            if na(xray3_eq)
+                xray3_eq := line.new(tOpen3, mid3, tClose3, mid3, xloc=xloc.bar_time, color=xray3_eqCol, style=line.style_dotted, width=1)
+            else
+                line.set_x1(xray3_eq, tOpen3), line.set_x2(xray3_eq, tClose3)
+                line.set_y1(xray3_eq, mid3), line.set_y2(xray3_eq, mid3)
+        else if not na(xray3_eq)
+            line.delete(xray3_eq)
+            xray3_eq := na
+
+// Slot 4
+var box xray4_body = na
+var line xray4_wick = na
+var line xray4_eq = na
+
+if xray4_en
+    [o4, h4, l4, c4] = request.security(syminfo.tickerid, xray4_tf, [open, high, low, close], barmerge.gaps_off, barmerge.lookahead_off)
+    tOpen4 = request.security(syminfo.tickerid, xray4_tf, time, barmerge.gaps_off, barmerge.lookahead_off)
+    tClose4 = request.security(syminfo.tickerid, xray4_tf, time_close, barmerge.gaps_off, barmerge.lookahead_off)
+    newHTF4 = ta.change(time(xray4_tf)) != 0
+    
+    top4 = math.max(o4, c4)
+    bot4 = math.min(o4, c4)
+    mid4 = (top4 + bot4) * 0.5
+    midTime4 = (tOpen4 + tClose4) / 2
+    bull4 = c4 >= o4
+    
+    if na(xray4_body) or newHTF4
+        if not na(xray4_body)
+            box.delete(xray4_body)
+        if not na(xray4_wick)
+            line.delete(xray4_wick)
+        if not na(xray4_eq)
+            line.delete(xray4_eq)
+        
+        xray4_body := box.new(tOpen4, top4, tClose4, bot4, xloc=xloc.bar_time, bgcolor=bull4 ? xray4_bullCol : xray4_bearCol, border_color=xray4_borderCol, border_width=1)
+        if xray4_showWick
+            xray4_wick := line.new(midTime4, h4, midTime4, l4, xloc=xloc.bar_time, color=xray4_wickCol, width=2)
+        if xray4_showEQ
+            xray4_eq := line.new(tOpen4, mid4, tClose4, mid4, xloc=xloc.bar_time, color=xray4_eqCol, style=line.style_dotted, width=1)
+    else
+        if not na(xray4_body)
+            box.set_left(xray4_body, tOpen4), box.set_right(xray4_body, tClose4)
+            box.set_top(xray4_body, top4), box.set_bottom(xray4_body, bot4)
+            box.set_bgcolor(xray4_body, bull4 ? xray4_bullCol : xray4_bearCol)
+        
+        if xray4_showWick
+            if na(xray4_wick)
+                xray4_wick := line.new(midTime4, h4, midTime4, l4, xloc=xloc.bar_time, color=xray4_wickCol, width=2)
+            else
+                line.set_x1(xray4_wick, midTime4), line.set_x2(xray4_wick, midTime4)
+                line.set_y1(xray4_wick, h4), line.set_y2(xray4_wick, l4)
+        else if not na(xray4_wick)
+            line.delete(xray4_wick)
+            xray4_wick := na
+        
+        if xray4_showEQ
+            if na(xray4_eq)
+                xray4_eq := line.new(tOpen4, mid4, tClose4, mid4, xloc=xloc.bar_time, color=xray4_eqCol, style=line.style_dotted, width=1)
+            else
+                line.set_x1(xray4_eq, tOpen4), line.set_x2(xray4_eq, tClose4)
+                line.set_y1(xray4_eq, mid4), line.set_y2(xray4_eq, mid4)
+        else if not na(xray4_eq)
+            line.delete(xray4_eq)
+            xray4_eq := na
+
+// === TIMEFRAME DIVIDERS ===
+
+// Get price range for full vertical lines
+priceHigh = ta.highest(high, 500)
+priceLow = ta.lowest(low, 500)
+
+// --- Process Divider 1 (Timeframe) ---
+if i_useDivider1
+    var lineStyle1 = switch i_lineStyleStr1
+        "Dotted" => line.style_dotted
+        "Dashed" => line.style_dashed
+        => line.style_solid
+    
+    tf_time1 = time(i_timeframe1)
+    bool isNewTimeframeBar1 = ta.change(tf_time1) != 0
+    
+    // Historical dividers (within lookback)
+    if isNewTimeframeBar1 and withinLookback
+        line.new(bar_index, priceLow, bar_index, priceHigh, xloc.bar_index, extend.both, i_lineColor1, lineStyle1, i_lineWidth1)
+        if i_showText1
+            label.new(bar_index, high, f_formatTimeframe(i_timeframe1), xloc.bar_index, yloc.abovebar, 
+                 color.new(color.white, 100), label.style_none, i_lineColor1, labelSizeValue)
+    
+    // Forward divider (forming candle close)
+    if i_showForward and barstate.islast
+        tClose1 = request.security(syminfo.tickerid, i_timeframe1, time_close, barmerge.gaps_off, barmerge.lookahead_off)
+        var line forwardLine1 = na
+        if not na(forwardLine1)
+            line.delete(forwardLine1)
+        forwardLine1 := line.new(tClose1, priceLow, tClose1, priceHigh, xloc.bar_time, extend.both, color.new(i_lineColor1, 50), lineStyle1, i_lineWidth1)
+
+// --- Process Divider 2 (Timeframe) ---
+if i_useDivider2
+    var lineStyle2 = switch i_lineStyleStr2
+        "Dotted" => line.style_dotted
+        "Dashed" => line.style_dashed
+        => line.style_solid
+    
+    tf_time2 = time(i_timeframe2)
+    bool isNewTimeframeBar2 = ta.change(tf_time2) != 0
+    
+    // Historical dividers (within lookback)
+    if isNewTimeframeBar2 and withinLookback
+        line.new(bar_index, priceLow, bar_index, priceHigh, xloc.bar_index, extend.both, i_lineColor2, lineStyle2, i_lineWidth2)
+        if i_showText2
+            label.new(bar_index, high, f_formatTimeframe(i_timeframe2), xloc.bar_index, yloc.abovebar, 
+                 color.new(color.white, 100), label.style_none, i_lineColor2, labelSizeValue)
+    
+    // Forward divider (forming candle close)
+    if i_showForward and barstate.islast
+        tClose2 = request.security(syminfo.tickerid, i_timeframe2, time_close, barmerge.gaps_off, barmerge.lookahead_off)
+        var line forwardLine2 = na
+        if not na(forwardLine2)
+            line.delete(forwardLine2)
+        forwardLine2 := line.new(tClose2, priceLow, tClose2, priceHigh, xloc.bar_time, extend.both, color.new(i_lineColor2, 50), lineStyle2, i_lineWidth2)
+
+// --- Process Divider 3 (Timeframe) ---
+if i_useDivider3
+    var lineStyle3 = switch i_lineStyleStr3
+        "Dotted" => line.style_dotted
+        "Dashed" => line.style_dashed
+        => line.style_solid
+    
+    tf_time3 = time(i_timeframe3)
+    bool isNewTimeframeBar3 = ta.change(tf_time3) != 0
+    
+    // Historical dividers (within lookback)
+    if isNewTimeframeBar3 and withinLookback
+        line.new(bar_index, priceLow, bar_index, priceHigh, xloc.bar_index, extend.both, i_lineColor3, lineStyle3, i_lineWidth3)
+        if i_showText3
+            label.new(bar_index, high, f_formatTimeframe(i_timeframe3), xloc.bar_index, yloc.abovebar, 
+                 color.new(color.white, 100), label.style_none, i_lineColor3, labelSizeValue)
+    
+    // Forward divider (forming candle close)
+    if i_showForward and barstate.islast
+        tClose3 = request.security(syminfo.tickerid, i_timeframe3, time_close, barmerge.gaps_off, barmerge.lookahead_off)
+        var line forwardLine3 = na
+        if not na(forwardLine3)
+            line.delete(forwardLine3)
+        forwardLine3 := line.new(tClose3, priceLow, tClose3, priceHigh, xloc.bar_time, extend.both, color.new(i_lineColor3, 50), lineStyle3, i_lineWidth3)
